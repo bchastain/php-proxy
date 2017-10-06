@@ -169,13 +169,107 @@ class ProxifyPlugin extends AbstractPlugin {
 		$str = preg_replace('@<iframe[^>]*>[^<]*<\\/iframe>@is', '', $str);
 		
 		$str = $this->proxify_head($str);
-		$str = $this->proxify_css($str);
+		//$str = $this->proxify_css($str);
 		
 		// src= and href=
-		$str = preg_replace_callback('@(?:src|href)\s*=\s*(["|\'])(.*?)\1@is', array($this, 'html_attr'), $str);
+		//$str = preg_replace_callback('@(?:src|href)\s*=\s*(["|\'])(.*?)\1@is', array($this, 'html_attr'), $str);
 		
 		// form
 		$str = preg_replace_callback('@<form[^>]*action=(["\'])(.*?)\1[^>]*>@i', array($this, 'form_action'), $str);
+
+
+		$str = preg_replace("@</body>@i", "
+			<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.1/jquery.min.js'></script>
+			<script src='https://cdnjs.cloudflare.com/ajax/libs/tabletop.js/1.5.2/tabletop.min.js'></script>
+			<script>
+				var public_spreadsheet_url = 'https://docs.google.com/spreadsheets/d/19U9p4LSvmRJfFjT9yfmKF4es2-aW1f3De8LiM_FkDMU/pubhtml';
+				var leagueID = '';
+				var maintableSel = '';
+				var teamposSel = '';
+				var playernameSel = '';
+				var playerabbrevSel = '';
+				var canFilter = true;
+				var ineligibles = [];
+
+				function load() {
+				  //Load spreadsheet
+				  Tabletop.init({
+				    key: public_spreadsheet_url,
+				    callback: showInfo,
+				    simpleSheet: true
+				  });
+				}
+				window.addEventListener('load', load, false);
+
+
+
+				function showInfo(data, tabletop) {
+				  //Get list of ineligible players
+				  ineligibles = data.map(function (v) {
+				    return v.player;
+				  });
+				  //Get variables from spreadsheet so they're not hardcoded
+				  //Will make future changes easier (no extension updates)
+				  leagueID = data[0].league;
+				  maintableSel = data[0].maintable;
+				  teamposSel = data[0].teampos;
+				  playernameSel = data[0].playername;
+				  playerabbrevSel = data[0].playerabbrev;
+				  //If this is C-teamers league, then proceed with filtering
+				  filterPlayers();
+				}
+
+
+				function filterPlayers(evt) {
+				  if (canFilter) {
+			      //Loop through all rows of players
+			      $(maintableSel).each(function (i, row) {
+			        //Get position/team
+			        var teampos = $(row.innerHTML).find(teamposSel)[0].innerHTML;
+			        //Get player name
+			        var playername = $(row.innerHTML).find(playernameSel)[0];
+			        //Check for alternate (abbreviated) name
+			        if (!playername) {
+			          playername = $(row.innerHTML).find(playerabbrevSel)[0].innerHTML;
+			        } else {
+			          playername = playername.innerHTML;
+			        }
+			        //Ineligible players uses abbreviation for first names, so need to
+			        //convert here. First check if it's a defense
+			        if (teampos.match(/- DEF/)) {
+			          //If defense, no abbreviation needed. Just append Pos
+			          playername += ' (' + teampos + ')';
+			        } else {
+			          //If player, abbreviate first name and add Pos
+			          playername = playername[0] + '.' +
+			            playername.substr(playername.indexOf(' ')) + ' (' + teampos + ')';
+			        }
+			        //Hide all ineligible rows
+			        if ($.inArray(playername, ineligibles) >= 0) {
+			          row.style.backgroundColor = 'red'
+			        }
+			      });
+
+			      //If user clicks a link, wait a second for the page to load and filter
+			      $('a').on('click', function (e) {
+			        setTimeout(filterPlayers, 1000);
+			      });
+
+			      //If user clicks anywhere else on the page (e.g. button), wait & filter
+			      document.addEventListener('click', function (e) {
+			        setTimeout(filterPlayers, 1000);
+			      }, false);
+			    }
+
+			    //Since it runs on clicks - need to limit calls to once per half-second
+			    canFilter = false;
+			    setTimeout(function () {
+			      canFilter = true;
+			    }, 500);
+
+				}
+			</script>
+			</body>", $str);
 		
 		$response->setContent($str);
 	}
