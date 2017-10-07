@@ -30,6 +30,11 @@ class ProxifyPlugin extends AbstractPlugin {
 	// replace src= and href=
 	private function html_attr($matches){
 		
+		// let css through
+		if(strpos($matches[0], '.css') !== false) {
+			return $matches[0];
+		}
+		
 		// could be empty?
 		$url = trim($matches[2]);
 		
@@ -172,7 +177,7 @@ class ProxifyPlugin extends AbstractPlugin {
 		//$str = $this->proxify_css($str);
 		
 		// src= and href=
-		//$str = preg_replace_callback('@(?:src|href)\s*=\s*(["|\'])(.*?)\1@is', array($this, 'html_attr'), $str);
+		$str = preg_replace_callback('@(?:src|href)\s*=\s*(["|\'])(.*?)\1@is', array($this, 'html_attr'), $str);
 		
 		// form
 		$str = preg_replace_callback('@<form[^>]*action=(["\'])(.*?)\1[^>]*>@i', array($this, 'form_action'), $str);
